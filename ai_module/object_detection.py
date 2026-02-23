@@ -13,7 +13,7 @@ model = YOLO("yolov8n.pt")
 IMPORTANT_OBJECTS = [
     "person",
     "chair",
-    "table",
+    "dining table",
     "car",
     "bicycle",
     "motorcycle",
@@ -21,7 +21,7 @@ IMPORTANT_OBJECTS = [
     "bus"
 ]
 
-CONFIDENCE_THRESHOLD = 0.5
+CONFIDENCE_THRESHOLD = 0.3
 DISTANCE_THRESHOLD = 100  # Alert only if object within 100 cm
 
 
@@ -60,10 +60,13 @@ def detect_obstacles(frame, last_announced_objects):
             confidence = float(box.conf[0])
             class_id = int(box.cls[0])
             object_name = model.names[class_id]
+             # 🔎 DEBUG PRINT
+            print(f"Detected: {object_name} | Confidence: {confidence:.2f} | Distance: {distance} cm")
+
 
             if (
                 confidence > CONFIDENCE_THRESHOLD
-                and object_name in IMPORTANT_OBJECTS
+                and any(keyword in object_name for keyword in IMPORTANT_OBJECTS)
                 and distance < DISTANCE_THRESHOLD
             ):
                 detected_objects.add(object_name)
