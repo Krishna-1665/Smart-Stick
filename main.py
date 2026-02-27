@@ -1,39 +1,38 @@
 import cv2
-from ai_module.object_detection import detect_obstacles, get_distance_from_arduino
+from ai_module.object_detection import detect_obstacles
 from voice_module.voice_alert import VoiceAlert
 
 
-def main():
 
-    # Initialize Voice
+def main():
+    obstacle_active = False
     voice = VoiceAlert()
     voice.system_start()
 
     cap = cv2.VideoCapture(0)
-    last_announced = set()
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
+        frame = cv2.resize(frame, (640, 480))
 
-        # Run Detection
-        frame, current_objects = detect_obstacles(frame, last_announced)
+        frame, current_objects, distance = detect_obstacles(frame, set())
+        distance=float(distance)
+        print("Distance:", distance)
+        print("Current Objects:", current_objects)
 
-        # Get Distance (same function used in detection)
-        distance = get_distance_from_arduino()
-
-        # Voice Integration (only new objects)
-        new_objects = current_objects - last_announced
-
-        for obj in new_objects:
+        for obj in current_objects:
             voice.object_detected(obj, distance)
 
-            # Extra alert if very close
-            if distance < 50:
-                voice.obstacle_alert()
-
-        last_announced = current_objects
+            if distance is not None:
+                if distance < 600:
+                    if not obstacle_active:
+                        print("Obstacle Detected! Speaking...")
+                        voice.obstacle_alert()
+                        obstacle_active = True
+                else:
+                    obstacle_active = False
 
         cv2.imshow("Smart Stick - Object Detection", frame)
 

@@ -1,11 +1,18 @@
 from ultralytics import YOLO
 import cv2
 import time
+import serial
 
 # -----------------------------
 # Load YOLO Model (Fast Nano Version)
 # -----------------------------
 model = YOLO("yolov8n.pt")
+
+# -----------------------------
+# Arduino Serial Connection
+# -----------------------------
+arduino = serial.Serial('COM3', 9600, timeout=1)
+time.sleep(2)
 
 # -----------------------------
 # Smart Stick Important Objects
@@ -22,36 +29,43 @@ IMPORTANT_OBJECTS = [
 ]
 
 CONFIDENCE_THRESHOLD = 0.3
-DISTANCE_THRESHOLD = 100  # Alert only if object within 100 cm
+DISTANCE_THRESHOLD = 50   # Speak only if object within 60 cm
 
 
 # -----------------------------
-# Placeholder: Distance from Arduino
-# Replace with real serial reading later
+# Get Distance From Arduino
 # -----------------------------
+last_valid_distance = 200.0  # global variable
+
 def get_distance_from_arduino():
-    """
-    Dummy distance simulation.
-    Replace this with real Arduino serial integration.
-    """
-    return 75  # Simulated distance (cm)
+    global last_valid_distance
 
+    try:
+        if arduino.in_waiting > 0:
+            raw = arduino.readline().decode().strip()
+            print("RAW FROM ARDUINO:", raw)
 
+            import re
+            numbers = re.findall(r"\d+", raw)
+
+            if numbers:
+                last_valid_distance = float(numbers[0])
+
+        return last_valid_distance
+
+    except Exception as e:
+        print("Serial Error:", e)
+        return last_valid_distance
+    
 # -----------------------------
 # Core Detection Function
 # -----------------------------
 def detect_obstacles(frame, last_announced_objects):
-    """
-    Detect important obstacles in frame.
-    Avoid repeated announcements.
-    
-    Returns:
-        annotated_frame
-        current_detected_objects (set)
-    """
 
-    results = model(frame)
+    results = model(frame, stream=True, imgsz=320)
     detected_objects = set()
+
+    # Get distance once per frame
     distance = get_distance_from_arduino()
 
     for result in results:
@@ -60,21 +74,18 @@ def detect_obstacles(frame, last_announced_objects):
             confidence = float(box.conf[0])
             class_id = int(box.cls[0])
             object_name = model.names[class_id]
-             # 🔎 DEBUG PRINT
+
             print(f"Detected: {object_name} | Confidence: {confidence:.2f} | Distance: {distance} cm")
 
-
+            # Check if important object
             if (
                 confidence > CONFIDENCE_THRESHOLD
-                and any(keyword in object_name for keyword in IMPORTANT_OBJECTS)
-                and distance < DISTANCE_THRESHOLD
+                and object_name in IMPORTANT_OBJECTS
             ):
-                detected_objects.add(object_name)
 
-                # Draw bounding boxes
+                # Draw bounding box
                 frame = result.plot()
 
-                # Show label + distance
                 cv2.putText(
                     frame,
                     f"{object_name} - {distance} cm",
@@ -85,13 +96,10 @@ def detect_obstacles(frame, last_announced_objects):
                     2
                 )
 
-    # Anti-spam logic (announce only new obstacles)
-    new_objects = detected_objects - last_announced_objects
+                # Only add if close enough
+                detected_objects.add(object_name)
 
-    for obj in new_objects:
-        print(f"Alert: {obj} detected at {distance} cm")
-
-    return frame, detected_objects
+    return frame, detected_objects, distance
 
 
 # -----------------------------
@@ -107,7 +115,10 @@ if __name__ == "__main__":
         if not ret:
             break
 
-        frame, current_objects = detect_obstacles(frame, last_announced)
+        frame, current_objects, distance = detect_obstacles(frame, last_announced)
+
+        print("Distance:", distance)
+        print("Current Objects:", current_objects)
 
         last_announced = current_objects
 
