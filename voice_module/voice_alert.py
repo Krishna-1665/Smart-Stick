@@ -7,12 +7,11 @@ class VoiceAlert:
         self.engine = pyttsx3.init()
         self.engine.setProperty("rate", 170)
         self.last_spoken_time = 0
-        self.cooldown = 2  # seconds between announcements
+        self.cooldown = 2  # seconds
 
     def speak(self, message):
         current_time = time.time()
 
-        # Anti-spam cooldown
         if current_time - self.last_spoken_time > self.cooldown:
             self.engine.say(message)
             self.engine.runAndWait()
@@ -21,8 +20,13 @@ class VoiceAlert:
     def system_start(self):
         self.speak("Smart stick system started")
 
-    def object_detected(self, label, distance):
-        self.speak(f"{label} detected at {distance} centimeters")
+    def object_detected(self, label, distance=None):
+        if distance is not None:
+            message = f"{label} detected at {distance} centimeters"
+        else:
+            message = f"{label} detected"
+
+        self.speak(message)   # ✅ FIXED HERE
 
     def obstacle_alert(self):
         self.speak("Obstacle ahead")
