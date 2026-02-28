@@ -29,7 +29,7 @@ IMPORTANT_OBJECTS = [
 ]
 
 CONFIDENCE_THRESHOLD = 0.3
-DISTANCE_THRESHOLD = 50   # Speak only if object within 60 cm
+DISTANCE_THRESHOLD = 100   # Speak only if object within 60 cm
 
 
 # -----------------------------
